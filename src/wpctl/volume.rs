@@ -10,7 +10,7 @@ const DEFAULT_SOURCE_SPECIFIER: &str = "@DEFAULT_AUDIO_SOURCE@";
 const MAXIMUM_VOLUME: f32 = 1.5;
 const MINIMUM_MODIFY_STEP: f32 = 0.01;
 const MUTED_SUFFIX: &str = "[MUTED]";
-const NOTIFICATION_NODE_MAX_LENGTH: usize = 21;
+const NOTIFICATION_NODE_MAX_LENGTH: usize = 24;
 
 pub struct VolumeOp {
     op_type: OpType,
@@ -104,18 +104,56 @@ fn toggle(specifier: String) {
 
 fn node_type_to_str(node_type: &NodeType) -> String {
     match node_type {
-        NodeType::Sink => {
-            "sink".to_string()
+        NodeType::Sink => "sink".to_string(),
+        NodeType::Source => "source".to_string(),
+    }
+}
+
+fn truncate_node_name(node: String) -> String {
+    let mut words = node.split(" ").collect::<Vec<_>>();
+    let mut cur_name = "".to_string();
+    loop {
+        if words.len() == 0 {
+            break;
         }
-        NodeType::Source => {
-            "source".to_string()
+
+        let next = words.get(0).cloned().unwrap();
+        words.remove(0);
+        if cur_name.len() == 0 {
+            cur_name.push_str(next);
+            continue;
         }
+
+        if cur_name.len() + 1 + next.len() < NOTIFICATION_NODE_MAX_LENGTH {
+            cur_name.push_str(" ");
+            cur_name.push_str(next);
+        } else {
+            break;
+        }
+    }
+    cur_name
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_truncate() {
+        assert_eq!(
+            truncate_node_name("foo bar baz qux fred barney".to_string()),
+            "foo bar baz qux fred".to_string()
+        );
+        assert_eq!(
+            truncate_node_name("foobarbazquxfredbarneywaldo".to_string()),
+            "foobarbazquxfredbarneywaldo".to_string()
+        );
     }
 }
 
 fn notify(volume: f32, node_type: &NodeType) {
     let node = get_default_node(node_type_to_str(node_type));
-    let truncated = node.chars().take(NOTIFICATION_NODE_MAX_LENGTH).collect();
+    let truncated = truncate_node_name(node);
     notify::volume(volume, truncated);
 }
 
