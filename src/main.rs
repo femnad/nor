@@ -4,7 +4,7 @@ mod wpctl;
 extern crate skim;
 
 use crate::wpctl::volume::{apply, VolumeOp, OpType};
-use clap::{Args, Command, CommandFactory, Parser, Subcommand};
+use clap::{Args, Command, CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Generator, Shell};
 use std::io;
 
@@ -57,6 +57,12 @@ enum Node {
     Source(NodeArgs),
 }
 
+#[derive(Clone, Debug, ValueEnum)]
+enum NodeType {
+    Sink,
+    Source,
+}
+
 #[derive(Args, Debug)]
 struct NodeArgs {
     #[arg(
@@ -70,17 +76,37 @@ struct NodeArgs {
 #[derive(Debug, Subcommand)]
 enum Op {
     #[command(about = "Decrease volume")]
-    Dec { step: Option<u32> },
+    Dec {
+        #[arg(default_value_t = NodeType::Sink, short = 't', long, value_enum)]
+        node_type: NodeType,
+        step: Option<u32> },
     #[command(about = "Get volume")]
-    Get,
+    Get {
+        #[arg(default_value_t = NodeType::Sink, short = 't', long, value_enum)]
+        node_type: NodeType,
+    },
     #[command(about = "Increase volume")]
-    Inc { step: Option<u32> },
+    Inc {
+        #[arg(default_value_t = NodeType::Sink, short = 't', long, value_enum)]
+        node_type: NodeType,
+        step: Option<u32>,
+    },
     #[command(about = "Set volume")]
-    Set { value: u32 },
+    Set {
+        #[arg(default_value_t = NodeType::Sink, short = 't', long, value_enum)]
+        node_type: NodeType,
+        value: u32,
+    },
     #[command(about = "Display volume")]
-    Show,
+    Show {
+        #[arg(default_value_t = NodeType::Sink, short = 't', long, value_enum)]
+        node_type: NodeType,
+    },
     #[command(about = "Toggle mute state")]
-    Toggle,
+    Toggle {
+        #[arg(default_value_t = NodeType::Sink, short = 't', long, value_enum)]
+        node_type: NodeType,
+    },
 }
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
@@ -105,12 +131,18 @@ fn main() {
         }
         Commands::Volume(op) => {
             let change = match op.op {
-                Op::Dec { step } => VolumeOp::new(OpType::Dec, step),
-                Op::Get => VolumeOp::new(OpType::Get, None),
-                Op::Inc { step } => VolumeOp::new(OpType::Inc, step),
-                Op::Set { value } => VolumeOp::new(OpType::Set { value }, None),
-                Op::Show => VolumeOp::new(OpType::Show, None),
-                Op::Toggle => VolumeOp::new(OpType::Toggle, None),
+                Op::Dec { step, node_type } => VolumeOp::new(
+                    OpType::Dec, step, node_type),
+                Op::Get {node_type} => VolumeOp::new(
+                    OpType::Get, None, node_type),
+                Op::Inc { step, node_type } => VolumeOp::new(
+                    OpType::Inc, step, node_type),
+                Op::Set { value, node_type } => VolumeOp::new(
+                    OpType::Set { value }, None, node_type),
+                Op::Show { node_type } => VolumeOp::new(
+                    OpType::Show, None, node_type),
+                Op::Toggle {node_type } => VolumeOp::new(
+                    OpType::Toggle, None, node_type),
             };
             apply(change);
         }
