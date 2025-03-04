@@ -153,7 +153,13 @@ mod tests {
 
 fn notify(volume: f32, node_type: &NodeType) {
     let node = get_default_node(node_type_to_str(node_type));
-    let truncated = truncate_node_name(node);
+    if node.is_none() {
+        notify::message(
+            format!("Cannot determine default {}", node_type_to_str(node_type)).as_str(),
+        );
+        return;
+    }
+    let truncated = truncate_node_name(node.unwrap());
     notify::volume(volume, truncated);
 }
 

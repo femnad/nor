@@ -302,7 +302,7 @@ pub fn show_defaults(prefer_gui: bool) {
     inform(joined.as_str(), prefer_gui);
 }
 
-pub fn get_default_node(node_type_str: String) -> String {
+pub fn get_default_node(node_type_str: String) -> Option<String> {
     let node_type = NodeType::from_str(&node_type_str).unwrap();
     let status = get_status();
     let nodes = match node_type {
@@ -313,5 +313,8 @@ pub fn get_default_node(node_type_str: String) -> String {
             &status.sources
         }
     };
-    default_node(nodes).unwrap().name.clone()
+    if let Some(node) = default_node(nodes) {
+        return Some(node.name.clone());
+    }
+    None
 }
