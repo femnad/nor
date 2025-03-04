@@ -302,7 +302,16 @@ pub fn show_defaults(prefer_gui: bool) {
     inform(joined.as_str(), prefer_gui);
 }
 
-pub fn default_sink() -> String {
+pub fn get_default_node(node_type_str: String) -> String {
+    let node_type = NodeType::from_str(&node_type_str).unwrap();
     let status = get_status();
-    default_node(&status.sinks).unwrap().name.clone()
+    let nodes = match node_type {
+        NodeType::Sink => {
+            &status.sinks
+        }
+        NodeType::Source => {
+            &status.sources
+        }
+    };
+    default_node(nodes).unwrap().name.clone()
 }

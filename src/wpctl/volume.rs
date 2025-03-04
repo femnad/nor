@@ -1,11 +1,12 @@
-use crate::notify;
-use crate::wpctl::WPCTL_EXEC;
-use crate::wpctl::node::default_sink;
+use crate::wpctl::node::get_default_node;
 use crate::wpctl::volume::OpType::Toggle;
+use crate::wpctl::WPCTL_EXEC;
+use crate::{notify, NodeType};
 use std::process::Command;
 
 const DEFAULT_MODIFY_STEP: u32 = 5;
 const DEFAULT_SINK_SPECIFIER: &str = "@DEFAULT_AUDIO_SINK@";
+const DEFAULT_SOURCE_SPECIFIER: &str = "@DEFAULT_AUDIO_SOURCE@";
 const MAXIMUM_VOLUME: f32 = 1.5;
 const MINIMUM_MODIFY_STEP: f32 = 0.01;
 const MUTED_SUFFIX: &str = "[MUTED]";
@@ -14,11 +15,16 @@ const NOTIFICATION_NODE_MAX_LENGTH: usize = 21;
 pub struct VolumeOp {
     op_type: OpType,
     step: Option<u32>,
+    node_type: NodeType,
 }
 
 impl VolumeOp {
-    pub fn new(change_type: OpType, step: Option<u32>) -> Self {
-        VolumeOp { op_type: change_type, step }
+    pub fn new(change_type: OpType, step: Option<u32>, node_type: NodeType) -> Self {
+        VolumeOp {
+            op_type: change_type,
+            step,
+            node_type,
+        }
     }
 }
 
@@ -32,9 +38,17 @@ pub enum OpType {
     Toggle,
 }
 
-fn lookup() -> f32 {
+fn get_source_specifier(node_type: &NodeType) -> String {
+    match node_type.clone() {
+        NodeType::Sink => DEFAULT_SINK_SPECIFIER.to_string(),
+        NodeType::Source => DEFAULT_SOURCE_SPECIFIER.to_string(),
+    }
+}
+
+fn lookup(node_type: &NodeType) -> f32 {
     let mut cmd = Command::new(WPCTL_EXEC);
-    cmd.args(["get-volume", DEFAULT_SINK_SPECIFIER]);
+    let source_specifier = get_source_specifier(node_type);
+    cmd.args(["get-volume", source_specifier.as_str()]);
     let out = cmd.output().expect("error getting volume");
     let vol_out = String::from_utf8(out.stdout).expect("error parsing cmd output");
     let vol_out_trim = vol_out.trim();
@@ -50,7 +64,7 @@ fn lookup() -> f32 {
     vol_f
 }
 
-fn modify(step: Option<u32>, sign: Option<&str>) {
+fn modify(step: Option<u32>, sign: Option<&str>, node_type: &NodeType) {
     let mut cmd = Command::new(WPCTL_EXEC);
 
     let modify_step = step.unwrap_or(DEFAULT_MODIFY_STEP);
@@ -61,39 +75,53 @@ fn modify(step: Option<u32>, sign: Option<&str>) {
         modify_volume.push_str(sign.unwrap());
     }
 
+    let node_specifier = get_source_specifier(&node_type);
+
     cmd.args([
         "set-volume",
         "-l",
         max_vol.as_str(),
-        DEFAULT_SINK_SPECIFIER,
+        node_specifier.as_str(),
         format!("{modify_volume}").as_str(),
     ]);
     cmd.status().expect("error setting volume");
 }
 
-fn modify_rel(step: Option<u32>, sign: &str) {
-    modify(step, Some(sign));
+fn modify_rel(step: Option<u32>, sign: &str, node_type: &NodeType) {
+    modify(step, Some(sign), node_type);
 }
 
-fn modify_set(value: u32) {
-    modify(Some(value), None);
+fn modify_set(value: u32, node_type: &NodeType) {
+    modify(Some(value), None, node_type);
 }
 
-fn toggle() {
+fn toggle(specifier: String) {
     let mut cmd = Command::new(WPCTL_EXEC);
 
-    cmd.args(["set-mute", DEFAULT_SINK_SPECIFIER, "toggle"]);
+    cmd.args(["set-mute", specifier.as_str(), "toggle"]);
     cmd.status().expect("error toggling volume");
 }
 
-fn notify(volume: f32) {
-    let sink = default_sink();
-    let truncated = sink.chars().take(NOTIFICATION_NODE_MAX_LENGTH).collect();
+fn node_type_to_str(node_type: &NodeType) -> String {
+    match node_type {
+        NodeType::Sink => {
+            "sink".to_string()
+        }
+        NodeType::Source => {
+            "source".to_string()
+        }
+    }
+}
+
+fn notify(volume: f32, node_type: &NodeType) {
+    let node = get_default_node(node_type_to_str(node_type));
+    let truncated = node.chars().take(NOTIFICATION_NODE_MAX_LENGTH).collect();
     notify::volume(volume, truncated);
 }
 
 pub fn apply(change: VolumeOp) {
-    let old_volume = lookup();
+    let node_type = change.node_type.clone();
+    let old_volume = lookup(&node_type);
     match change.op_type {
         dec_or_inc @ (OpType::Dec | OpType::Inc) => {
             let sign = match dec_or_inc {
@@ -101,22 +129,22 @@ pub fn apply(change: VolumeOp) {
                 OpType::Inc => "+",
                 _ => unreachable!("Unexpected volume change type {:?}", dec_or_inc),
             };
-            modify_rel(change.step, sign);
+            modify_rel(change.step, sign, &node_type);
         }
         OpType::Get => {
             println!("volume: {}", old_volume);
             return;
         }
-        OpType::Set { value } => modify_set(value),
+        OpType::Set { value } => modify_set(value, &node_type),
         OpType::Show => {
-            notify(old_volume);
+            notify(old_volume, &node_type);
             return;
-        },
-        Toggle => toggle(),
+        }
+        Toggle => toggle(get_source_specifier(&node_type)),
     };
 
-    let new_volume = lookup();
+    let new_volume = lookup(&change.node_type);
     if old_volume != new_volume || new_volume == 0.0 {
-        notify(new_volume);
+        notify(new_volume, &node_type);
     }
 }
