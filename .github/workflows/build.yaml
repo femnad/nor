@@ -47,8 +47,9 @@ jobs:
           TARGET: x86_64-unknown-linux-gnu
         run: |
           version='${{ needs.build-and-test.outputs.version }}'
-          if gh release list --json name | jq .[].name -r | grep -E "^${version}$"
+          if gh release list --json name | jq .[].name -r | grep -E "^${version}$" > /dev/null
           then
+            echo "A release for ${version} already exists."
             exit
           fi
 
