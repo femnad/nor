@@ -1,0 +1,52 @@
+name: Test and release
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cargo build
+        run: cargo build
+
+      - name: Cargo test
+        run: cargo test
+
+      - name: Output version
+        id: version
+        run: |
+          version=$(cargo run -- --version | awk '{print $2}')
+          echo "value=${version}" | tee -a "$GITHUB_OUTPUT"
+
+  release:
+    name: Create a new release if needed
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Create a release if not one exist for current version
+        env:
+          TARGET: x86_64-unknown-linux-gnu
+        run: |
+          version='${{ needs.build-and-test.outputs.version }}'
+          if gh release list --json name | jq .[].name -r | grep -E "^${version}$"
+          then
+            exit
+          fi
+
+          export RUSTFLAGS='-C target-feature=+crt-static'
+          cargo build --release --target "$TARGET"
+
+          name=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
+          gh release create -- "target/${TARGET}/release/${name}"
