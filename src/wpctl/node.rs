@@ -164,9 +164,9 @@ fn select_with_skim(node_names: Vec<String>, prompt: &str) -> Option<String> {
         format!("{prompt}: ")
     };
     let options = SkimOptionsBuilder::default()
-        .height(Some("100%"))
+        .height("100%".to_string())
         .multi(false)
-        .prompt(Some(prompt.as_str()))
+        .prompt(prompt)
         .build()
         .unwrap();
     let item_reader = SkimItemReader::default();
