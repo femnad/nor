@@ -26,12 +26,6 @@ jobs:
       - name: Cargo test
         run: cargo test
 
-      - name: Output version
-        id: version
-        run: |
-          version=$(cargo run -- --version | awk '{print $2}')
-          echo "value=${version}" | tee -a "$GITHUB_OUTPUT"
-
   release:
     name: Create a new release if needed
     runs-on: ubuntu-latest
@@ -49,7 +43,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           TARGET: x86_64-unknown-linux-gnu
         run: |
-          version='${{ needs.build-and-test.outputs.version }}'
+          version=$(cargo run -- --version | awk '{print $2}')
           if gh release list --json name | jq .[].name -r | grep -E "^${version}$" > /dev/null
           then
             echo "A release for ${version} already exists."
