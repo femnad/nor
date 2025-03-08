@@ -160,13 +160,7 @@ fn notify(volume: f32, node_type: &NodeType) {
         return;
     }
     let truncated = truncate_node_name(node.unwrap());
-    let prefix = match node_type {
-        NodeType::Sink => {"🔈"}
-        NodeType::Source => {"🎤"}
-    };
-    let node = format!("{prefix} {truncated}");
-    let truncated = truncate_node_name(node);
-    notify::volume(volume, truncated);
+    notify::volume(volume, truncated, node_type);
 }
 
 pub fn apply(change: VolumeOp) {
