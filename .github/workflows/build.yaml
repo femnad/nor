@@ -43,7 +43,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           TARGET: x86_64-unknown-linux-gnu
         run: |
-          version=$(cargo run -- --version | awk '{print $2}')
+          version=$(grep -E '^version' Cargo.toml | awk -F '"' '{print $2}')
           if gh release list --json name | jq .[].name -r | grep -E "^${version}$" > /dev/null
           then
             echo "A release for ${version} already exists."
