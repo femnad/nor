@@ -60,4 +60,4 @@ jobs:
           cargo build --release --target "$TARGET"
 
           name=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
-          gh release create --generate-notes "target/${TARGET}/release/${name}"
+          gh release create "$version" --generate-notes "target/${TARGET}/release/${name}"
